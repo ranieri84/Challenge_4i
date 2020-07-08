@@ -43,6 +43,8 @@ library(corrplot)
 library(tidyverse)
 library(lubridate)
 library(ggpubr)
+library(reshape)
+
 ```
 
 
@@ -355,7 +357,7 @@ ggplot(route,aes(x="",y=usdp,fill=route))+
      geom_bar(width = 1, stat = "identity", color = "white") +
     coord_polar("y",start = 0)+facet_wrap(.~factor(product))+
     scale_fill_brewer(palette="Dark2")+theme_classic()
- labs(title = "Exports routes of corn since 2017 in USD",y="USD(Billions)")+
+ labs(title = "Exports routes of corn since 2017 in USD",y="USD(Billions)")
 
 ```
 It become clear that all products are exported by sea, which makes senses as ship transportation is usualy the chapest one.
