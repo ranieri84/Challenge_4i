@@ -1,0 +1,500 @@
+---
+title: "Data Analysis Skill Test"
+author: "Vinicius Ranieri"
+date: "7/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+This is a file to demonstrate data analysis skills for 4intelligence
+Two cases will be analyzed, first one will look into total-factor productivity (TFP) for three countries: United States (USA), Canada (CAN) and Mexico (MEX) and the second case some analysis will be done on data from Comexstat, which is basically the official data source for brazilian exports e imports, maintened by the government.
+
+
+## Case 1 - 
+
+
+The data anaylsis is focused to address the following questions and requests regarding the total-factor productivity (TFP) of three countries: United States (USA), Canada (CAN) and Mexico (MEX).
+
+
+1. Make an exploratory data analysis;
+
+2.Forecast 10 years of the series using package “forecast”);
+
+3.Check in the following link pages 2 and 3: [https://cran.r-project.org/web/packages/pwt8/pwt8.pdf](https://cran.r-project.org/web/packages/pwt8/pwt8.pdf) to see a list of all variables in the original dataset. Can you think about another feature that could be helpful in explaining TFP series? Explain.
+
+
+### Data processing aand pre-settings
+
+During this exercise, the following libraries are required to run this code. Make sure to have then installed prior to running the code
+```{r}
+library(ggplot2)
+library(forecast)
+library(knitr)
+library(kableExtra)
+library(forecast)
+library(xlsx)
+library(GGally)
+library(corrplot)
+library(tidyverse)
+library(lubridate)
+library(ggpubr)
+```
+
+
+First step is to load the data into a dataframe "df" and factor by country name. 
+
+```{r}
+#Load data
+df<-read.csv("TFP.csv")
+
+df$isocode<-factor(df$isocode) #factor  country names
+summary(df)
+
+```
+
+Based on the summary above, it shows that there are similar amounts of data for each country, which minimizes the effects of bias in the data in case some statistical metrics.
+
+### Exploratory analysis
+
+A histogram can show if the data is follows a normal distribution. The library ggplo2 2 is going to be used to generate the charts in this file.
+
+```{r}
+ggplot(df,aes(x=rtfpna,fill=isocode))+ facet_wrap(~isocode)+
+  geom_histogram(color="black")+labs(title = "TFP index distribution per contry")+
+    labs(x="Total Factor Productivity",y="Count in Years",fill = "Country")+ theme_minimal()
+
+```
+
+Looking at the histogram, the data does not seems to be follow a normal distribution.
+
+Let´s see how the TPF evolved along the years through a time series chart.
+```{r}
+ggplot(df,aes(x=year, y=rtfpna))+
+     geom_line(aes(color = isocode),size=2)+
+    labs(title = "Evolution of Total-factor productivity (TFP) per country")+
+    labs(y="Total-factor productivity (TFP)")+labs(x="Years")+
+    labs( color = "Country")+ theme_minimal()
+```
+
+Data series are usually composed by a trend, a seasonal and a remainder. Looking at the chart it is really hard to find any seasonal component,while a clear increasing trend on USA data can be  noticed.
+
+
+### 10 years Time Series predicition
+
+To perform a 10 year prediction for each country, we need to convert the  data type into a time Series which is required for the forecast() R package. 
+A multivariable timeseries will be created with one colunm per country and one column with time data(year in this case).
+the code below does that conversion. 
+
+```{r}
+#Reshape data grouping the TFP by date and Country
+df_reshape <- reshape(data=df,idvar="year",
+                           v.names = "rtfpna",
+                           timevar = "isocode",
+                          direction="wide")
+                 
+#convert df_reshape into time series(ts1), Frequency=1 means one row per year startin
+#Frequency=1 means one row per year starting in 1950
+ts1<-ts(df_reshape[,2:4],start=1950,frequency=1) 
+
+#Assign Colonm names
+colnames(ts1)=unique(df$isocode)
+head(ts1)
+```
+
+The forecast function is going to be used to predict the time series values at a certain time in future. It will choose the algorithm automatically which could be dangerous in some situations.The forecast library is required for this prediction.
+
+```{r}
+# Forecast 10 years ahead of current data
+ts1f<-forecast(ts1,h=10)
+
+# Display the methodology used for the prediction
+ts1f$method
+
+#Predicted data series Plot
+autoplot(ts1f)+labs(x="Year",y="TFP Value", title="TFP prediction fot next 10 years per country")+
+    theme_light()
+```
+
+The dark blue line corresponds to the prediction while the  light blue area means 80% of confidence level interval and the dark blue area corresponds to the 95% confidence level interval. We can notice that USA has a much narrow confidence interval while CAn has the most spread interval.
+We can also notice on top of each graph what was the model used to predict the time series. In all cases the Exponential Smoothing State Space Model was used. The first letter denotes the error type; the second letter denotes the trend type; and the third letter denotes the season type. In all cases, "N"=none, "A"=additive, "Ad"=additive damped and  "M"=multiplicative selected. So, "ANN" is simple exponential smoothing with additive errors, "MAdN" is Damped trend method with additive errors.
+
+
+Let´s take a look into prediction and its corresponds confidence intervals.
+
+```{r}
+#Extract prediction and confidence intervals from forecast object
+
+USA<-as.data.frame(ts1f$forecast[1])
+CAN<-as.data.frame(ts1f$forecast[2])
+MEX<-as.data.frame(ts1f$forecast[3])
+colnames(USA)<-c("Forecast","Lo80%","Hi80%","Lo95%","Hi95%")
+colnames(CAN)<-c("Forecast","Lo80%","Hi80%","Lo95%","Hi95%")
+colnames(MEX)<-c("Forecast","Lo80%","Hi80%","Lo95%","Hi95%")
+
+kable(cbind(USA,CAN,MEX)[,c(1,4,5,6,9,10,11,14,15)], 
+      caption = "USA TFP prediction for next 10 years", 
+      booktabs = T, digits = 3) %>%
+    kable_styling(c("bordered","striped"), full_width = T) %>%
+    add_header_above(c("Year ", "USA" = 3, "CAN" = 3, "MEX 3" = 3)) 
+```
+ 
+
+
+```{r}
+
+```
+
+
+### Further investigation about TFP
+
+From the charts we could notice that Mexico has a declining trend, Canada is more or less stable with a decline trend in the past year while USA is in a growth trend. To better understand the reasons why, we first need to look into TFP definition to identify what other variables affect this numbers.
+According to the [Capital, labor and TFP in PWT 8.0](https://www.rug.nl/ggdc/docs/capital_labor_and_tfp_in_pwt80.pdf), Productivity is, in general, a measure of output divided by a measure of input.Here,	we are interested in country-level productivity,so GDP as the measure of	output  and capital	and	labor as inputs.
+
+A general production function combining capital	K and labor	input L with a level of	productivity A to produce output	Y is given below.
+
+Y = Af (K,L) = AKα (Ehc)^1−α
+
+The	second equality defines	labor input as the product of the number of	workers in the economy **E** times their average human capital **hc**; introduces **α** as the output elasticity of capital, as an proximation, 	**α** is assumed as the share of	GDP	that is	not	earned by labor.
+Therefore we should look into those variables to understand what is driving the TFP changes. 
+
+Looking at the other variables available in the original dataset, and that the TFP is based on at constant national prices(2005=1), we should look into:
+
+* **rgdpna** - Real GDP at constant 2005 national prices (in million 2005 USD)
+
+* **rkna** - Capital stock at constant 2005 national prices (in million 2005 USD) and 
+
+* **emp** - Number of persons engaged (in millions)
+
+ **labsh** Share of labour compensation in GDP at current national prices
+ 
+ **hc**  Index of human capital per person, based on years of schooling (Barro and Lee 2013) and returns
+to education (Psacharopoulos 1994).
+
+
+## Case 2
+
+On this exercise some analysis will be performaned with data from Comexstat, official data source for brazilian exports e imports, maintened by the government.
+
+There are 6 questions to  be addressed in this exercise
+
+1.Show the evolution of total monthly and total annual exports from Brazil (all states and to everywhere) of ‘soybeans’, ‘soybean oil’ and ‘soybean meal’;
+
+2.What are the 3 most important products exported by Brazil in the last 5 years?
+
+3.What are the main routes through which Brazil have been exporting ‘corn’ in the last few years? Are there differences in the relative importancem of routes depending on the product?
+
+4.Which countries have been the most important trade partners for Brazil in terms of ‘corn’ and ‘sugar’ in the last 3 years?
+
+5.For each of the products in the dataset, show the 5 most important states in terms of exports?
+
+6.Now, we ask you to show your modelling skills. Feel free to use any type of modelling approach, but bear in mind that the modelling approach depends on the nature of your data, and so different models yield different estimates and forecasts. To help you out in this task we also provide you with a dataset of possible covariates (.xlsx). They all come from public sources (IMF, World Bank) and are presented in index number format. Question: What should be the total brazilian soybeans, soybean_meal, and corn export forecasts, in tons, for the next 11 years (2020-2030)? We’re mostly interested in the annual forecast.
+
+### Data processing aand pre-settings
+
+First step is to load the data into a dataframe "df2", and convert the date into a Date class. A Summary of df is provided below
+```{r}
+df2<-read.csv("data_comexstat.csv",stringsAsFactors = T)
+df2$date=as.Date(df2$date,format = "%Y-%m-%d")
+summary(df2)
+```
+
+
+Second step is to add all volume and income from same day, differentiating by product, type and date.
+
+To answer some of the questions will also be required to subset data by month and year, so month and year will be added as variables
+```{r}
+# Aggregate by product, type and date
+df2agg<-aggregate(list(tons = df2$tons, usd=df2$usd), by = list(
+    date=df2$date,product = df2$product,type=df2$type),FUN=sum)
+
+
+#Add Month and year as variables
+df2agg$year <- year(df2agg$date)
+df2agg$month <- factor(month(df2agg$date,label=TRUE,abbr=TRUE))
+summary(df2agg)
+```
+
+### Data analysis
+
+#### Soybeans, Soybean oil and soybean meal total monthly and total annual exports from Brazil evolution. 
+
+To get the answer the question it is required to Subset the data looking only to export soybeans,soybean_meal,soybean_oil income.
+For annual exports, the sum of all volume and income from the year will be added
+```{r}
+
+#Subset by export and products
+df3 = df2agg[df2agg$product %in%c("soybeans","soybean_meal","soybean_oil") & df2agg$type=="Export",]
+
+#Calculate year productions
+df3year<-aggregate(list(tons = df3$tons, usd=df3$usd), by = list(
+    date=df3$year,product = df3$product),FUN=sum)
+
+```
+
+Let´s take a look into some charts 
+
+```{r}
+#Line chart
+ggplot(df3year,aes(x=date,y=usd/10^9))+geom_line(aes(color = product),size=1)+
+    labs(title = "Annual Exports of Soybean products in USD",y="USD(Billions)")+
+    theme_minimal()
+
+ggplot(df3year,aes(x=date,y=tons/10^6))+geom_line(aes(color = product),size=1)+
+    labs(title = "Annual Exports of Soybean products in tons(Millions)",y="tons")+
+    theme_minimal()
+
+```
+
+We can notice the the soybean had a boom in the past years, not followed by the others products
+
+
+For the monthly exports I going to use the box plot,  so we can also check the variance and some seasonality of the data
+I also would take advantage of same R packages to show the seasonality, which is required to create a timeseries object
+
+```{r}
+#box plot
+ggplot(df3, aes(x=month, y=usd/10^9,fill=product)) + 
+    geom_boxplot() +
+    facet_wrap(~product,scales = "free")+
+    labs(title = "Monthly Exports of Soybean products in USD",y="USD(Billions)")
+
+
+#Reshape data to create a new time series
+temp <- reshape(data=df3,idvar="date",drop = c("tons","year","month","type"),
+                           v.names = "usd",timevar = "product",
+                          direction="wide")
+                
+
+#Time series 
+tsc2<-ts(temp[,2:4],start=c(1997,1),frequency=12)
+colnames(tsc2)=unique(df3$product) 
+
+p1<-ggseasonplot(tsc2[,1],polar = T)
+p2<-ggseasonplot(tsc2[,2],polar = T)
+p3<-ggseasonplot(tsc2[,3],polar = T)
+figure <- ggarrange(p1, p2, p3,
+                    labels = c("A", "B", "C"),
+                    ncol = 2, nrow = 2)
+figure
+
+```
+We can see that data is seasonal, with more export during the winter. Also it is noticed taht soybeans has much more variability
+
+### Most important products in the past 5 years
+
+In this case we need to take data starting at 2015
+
+```{r}
+#Take export data starting at 2015, Aggregate by year and product
+df4 = df2agg[df2agg$type=="Export"& df2agg$date>=as.Date('2015-01-01'),]
+df4year<-aggregate(list(tons = df4$tons, usd=df4$usd), by = list(
+    date=df4$year,product = df4$product),FUN=sum)
+
+
+ggplot(df4year,aes(x=product,y=usd/10^9))+geom_bar(stat="identity",fill = "blue")+
+    labs(title = "Exports since 2015 by products in USD",y="USD(Billions)")+
+    theme_minimal()
+ggplot(df4,aes(x=date,y=usd))+geom_line(aes(color = product),size=1)
+
+```
+From that chart we can see that soybeans, sugar and soybeans meal are the 3 most important products in terms of export revenue; 
+
+### Corn Export Main routes 
+
+Let´s look into the routs that corn has been exported in the past 3 years. This time data will be aggregated by route
+
+```{r}
+#aggregate by route,product.type and date.
+corn_agg<-aggregate(list(tons = df2$tons, usd=df2$usd), by = list(
+    date=df2$date,product = df2$product,type=df2$type,route=df2$route),FUN=sum)
+#filter data for Export in the past 3 years
+corn_fil<-filter(corn_agg,type=="Export",product=="corn",date>=('2017-01-01'))
+
+#Sum the total of exports by route
+corn_route<-aggregate(list(usd=corn_fil$usd), by = list(
+    route = corn_fil$route),FUN=sum)
+
+#plot data
+ggplot(corn_route,aes(x=route,y=usd/10^9))+geom_bar(stat="identity",fill = "blue")+
+    labs(title = "Exports routes of corn since 2017 in USD",y="USD(Billions)")+
+    theme_minimal()
+
+```
+It is clear that transportation by sea is the most used for corn
+
+Let´s take a look into other products to see if the same patter is seen.
+
+```{r}
+
+# Select other products
+fil<-filter(df2,type=="Export",date>=('2017-01-01'))
+route<-aggregate(list(usd=fil$usd,tons=fil$tons), by = list(
+    route = fil$route,product=fil$product),FUN=sum)
+
+
+
+#Normalizing data to be displayed into the pie chart
+z<-1
+route$usdp<-route$usd
+for(i in 1:length(unique(route$product))){
+    tsum<-route$usd[route$product==unique(route$product)[i]]
+                 for(j in 1:length(tsum)){
+                     route$usdp[z]<-100*route$usd[z]/sum(tsum)
+                     z<-z+1
+                 }
+}
+
+#Pie Plot
+
+ggplot(route,aes(x="",y=usdp,fill=route))+
+     geom_bar(width = 1, stat = "identity", color = "white") +
+    coord_polar("y",start = 0)+facet_wrap(.~factor(product))+
+    scale_fill_brewer(palette="Dark2")+theme_classic()
+ labs(title = "Exports routes of corn since 2017 in USD",y="USD(Billions)")+
+
+```
+It become clear that all products are exported by sea, which makes senses as ship transportation is usualy the chapest one.
+
+### Most importan partneres for Corn and Suggar
+
+Let´s take a look into those variables, i will also include soybeans e soybeans_meal in the filter as they will to be used later on
+```{r}
+
+fil<-filter(df2,type=="Export",date>=('2017-01-01')& product %in% c("corn","sugar","soybeans","soybean_meal"))
+partners<-aggregate(list(usd=fil$usd,tons=fil$tons), by = list(
+        country = fil$country,product=fil$product),FUN=sum)
+
+partners<-partners[order(-partners$usd),]
+head(partners[partners$product=="sugar",],10)
+head(partners[partners$product=="corn",],10)
+head(partners[partners$product=="soybeans",],10)
+head(partners[partners$product=="soybean_meal",],10)
+```
+
+Argelia and Blangadesh are the top importers of brazilian sugar with similar volumes. Iran is higher consumer of brazilian corner with almost 2 times more imports han Japan that comes in second
+
+### Most Important states for each product
+```{r}
+
+fil<-filter(df2,type=="Export")
+states<-aggregate(list(usd=fil$usd,tons=fil$tons), by = list(
+        states = fil$state,product=fil$product),FUN=sum)
+
+ggplot(states,aes(x=states,y=usd/10^9,fill=states))+
+    geom_bar(stat= "identity", aes(fill = states))+
+    facet_wrap(~product,scales = "free")+
+    labs(title = "States Exports by product since 1997 in USD",y="USD(Billions)")
+
+```
+
+### Modeling
+
+
+Let´s import the covariates data provided, and filter the export data by the products that we are interested on.
+Then the covariates data will be merged with the export data.
+```{r}
+#load covariate file
+cov<-read.xlsx("covariates.xlsx",sheetIndex =1)
+
+
+#filter data with desired products
+fil<-filter(df2agg,type=="Export" & product %in% c("corn","soybeans","soybean_meal"))
+
+
+#aggegate by year
+prodyear<-aggregate(list(usd=fil$usd,tons=fil$tons), by = list(
+        year = fil$year,product=fil$product),FUN=sum)
+
+#reashape to merge
+prodyear2<-cast(prodyear, year ~ product, mean, value = 'usd')
+
+
+#merge data
+df5<-merge(prodyear2,cov,by="year",all.x = FALSE)
+
+
+```
+
+
+
+Lets see the correlation beteween  the variables
+```{r}
+
+M<-cor(df5)
+# correlogram with hclust reordering
+corrplot(M, type="upper", order="hclust")
+
+
+```
+
+This char shows which variables have more potential do have a strong relashiship with another,
+
+
+A muultivariable linear regression will be performed fisrt all data is taken in consideration.
+Corn will be the first to be analyzed
+
+```{r}
+model_corn <- lm(corn ~ ., data = df5)
+summary(model_corn)
+
+
+```
+
+The goal is to get to a model where the last column is <0.05 in the first line and also the variables used in the correlation, which means that those variables has a strong relationship with the desired outcome(usd)
+ 
+We are going to use only the variables present in  the covariates files, after some work, this combination with corn price, Iran and Japan GDP is satisfactory and use to predict data for next 11 years
+
+
+```{r}
+model_corntop5 <- lm(corn ~ year+price_corn+gdp_iran+gdp_japan, data = df5)
+summary(model_corntop5)
+
+#evaluate model error
+sigma(model_corntop5)/mean(df5$corn)
+
+#prediction
+corn_11years<-predict(model_corntop5, cov[cov$year>2019,])
+
+```
+
+The same rational is used for the other products
+
+```{r}
+# Soybenas_meal
+model_soybean_meal <- lm(soybean_meal ~ ., data = df5)
+summary(model_soybean_meal)
+
+#refined model
+model_soybean_mealtop5 <- lm(soybean_meal~ year+price_corn +gpd_netherlands, data = df5)
+summary(model_soybean_mealtop5)
+
+#error and prediction
+sigma(model_soybean_mealtop5)/mean(df5$soybean_meal)
+soybean_meal_11years<-predict(model_soybean_mealtop5, cov[cov$year>2019,])
+
+
+# Soybenas
+model_soybeans <- lm(soybeans ~ ., data = df5)
+summary(model_soybeans)
+
+#refined model
+model_soybeanstop5 <- lm(soybeans~ gdp_china+price_soybean_meal+price_soybeans, data = df5)
+summary(model_soybeanstop5)
+
+#error and prediction
+sigma(model_soybeanstop5)/mean(df5$soybeans)
+soybean_11years<-predict(model_soybeanstop5, cov[cov$year>2019,])
+```
+
+The projected value of each product is show below
+
+```{r}
+cbind(corn_11years,soybean_meal_11years,soybean_11years)
+predcition<-na.omit(as.data.frame(cbind(corn_11years,soybean_meal_11years,soybean_11years)))
+row.names(predcition)<-seq(2020,2030)
+```
