@@ -15,7 +15,7 @@ This is a file to demonstrate data analysis skills for 4intelligence
 Two cases will be analyzed, first one will look into total-factor productivity (TFP) for three countries: United States (USA), Canada (CAN) and Mexico (MEX) and the second case some analysis will be done on data from Comexstat, which is basically the official data source for brazilian exports e imports, maintened by the government.
 
 
-## Case 1 - 
+## Case 1 -
 
 
 The data anaylsis is focused to address the following questions and requests regarding the total-factor productivity (TFP) of three countries: United States (USA), Canada (CAN) and Mexico (MEX).
@@ -31,7 +31,7 @@ The data anaylsis is focused to address the following questions and requests reg
 ### Data processing aand pre-settings
 
 During this exercise, the following libraries are required to run this code. Make sure to have then installed prior to running the code
-```{r}
+```{r,message=FALSE}
 library(ggplot2)
 library(forecast)
 library(knitr)
@@ -496,7 +496,7 @@ soybean_11years<-predict(model_soybeanstop5, cov[cov$year>2019,])
 The projected value of each product is show below
 
 ```{r}
-cbind(corn_11years,soybean_meal_11years,soybean_11years)
 predcition<-na.omit(as.data.frame(cbind(corn_11years,soybean_meal_11years,soybean_11years)))
 row.names(predcition)<-seq(2020,2030)
+predcition
 ```
